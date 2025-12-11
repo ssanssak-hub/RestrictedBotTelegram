@@ -1,0 +1,68 @@
+{
+  "user_limits": {
+    "free": {
+      "daily_downloads": 10,
+      "total_downloads": 100,
+      "max_file_size_mb": 500,
+      "concurrent_downloads": 3,
+      "storage_gb": 1,
+      "bandwidth_gb": 10
+    },
+    "premium": {
+      "daily_downloads": 50,
+      "total_downloads": 10000,
+      "max_file_size_mb": 2048,
+      "concurrent_downloads": 5,
+      "storage_gb": 10,
+      "bandwidth_gb": 100
+    },
+    "vip": {
+      "daily_downloads": 200,
+      "total_downloads": 100000,
+      "max_file_size_mb": 10240,
+      "concurrent_downloads": 10,
+      "storage_gb": 50,
+      "bandwidth_gb": 1000
+    }
+  },
+  
+  "system_limits": {
+    "max_users": 1000,
+    "max_files": 10000,
+    "total_storage_gb": 100,
+    "monthly_bandwidth_gb": 1000,
+    "max_concurrent_connections": 1000
+  },
+  
+  "time_limits": {
+    "daily_reset_hour": 0,
+    "monthly_reset_day": 1,
+    "session_timeout_minutes": 30,
+    "download_timeout_seconds": 300
+  },
+  
+  "violation_policy": {
+    "max_violations_before_ban": 5,
+    "ban_duration_days": 7,
+    "warning_threshold_percent": 80,
+    "auto_unban_after_days": 30
+  },
+  
+  "tier_pricing": {
+    "free": {
+      "price_monthly": 0,
+      "price_yearly": 0,
+      "features": ["basic_download", "limited_storage"]
+    },
+    "premium": {
+      "price_monthly": 50000,
+      "price_yearly": 500000,
+      "features": ["priority_download", "more_storage", "faster_speed"]
+    },
+    "vip": {
+      "price_monthly": 150000,
+      "price_yearly": 1500000,
+      "features": ["unlimited_download", "maximum_speed", "priority_support"]
+    }
+  }
+}
