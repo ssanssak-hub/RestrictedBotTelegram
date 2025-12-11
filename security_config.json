@@ -1,0 +1,45 @@
+{
+  "access_control": {
+    "allowed_users": [123456789],
+    "auto_approve_new_users": false,
+    "require_admin_approval": true,
+    "max_users": 100,
+    "ban_after_failed_logins": 5
+  },
+  "session_security": {
+    "encrypt_session_files": true,
+    "isolate_user_sessions": true,
+    "session_timeout_hours": 24,
+    "auto_logout_inactive_minutes": 60,
+    "max_sessions_per_user": 3,
+    "session_backup_enabled": true
+  },
+  "authentication": {
+    "require_phone_verification": true,
+    "enable_2fa": false,
+    "login_attempt_limit": 3,
+    "lockout_duration_minutes": 30,
+    "password_min_length": 6
+  },
+  "privacy": {
+    "store_phone_numbers": false,
+    "store_messages": false,
+    "log_user_activities": true,
+    "anonymize_logs": true,
+    "data_retention_days": 7
+  },
+  "notifications": {
+    "notify_on_new_login": true,
+    "notify_on_logout": true,
+    "notify_on_failed_login": true,
+    "admin_notification_channel": "@admin_alerts",
+    "user_notification_language": "fa"
+  },
+  "monitoring": {
+    "enable_activity_monitoring": true,
+    "alert_on_suspicious_activity": true,
+    "log_all_operations": true,
+    "daily_report_enabled": true,
+    "real_time_alerts": true
+  }
+}
