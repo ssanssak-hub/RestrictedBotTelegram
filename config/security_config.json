@@ -1,0 +1,49 @@
+{
+  "authentication": {
+    "two_factor_enabled": true,
+    "session_timeout_minutes": 60,
+    "max_login_attempts": 3,
+    "lockout_duration_minutes": 30,
+    "password_min_length": 8
+  },
+  
+  "encryption": {
+    "enabled": true,
+    "algorithm": "AES-256-GCM",
+    "key_rotation_days": 30,
+    "encrypt_sessions": true,
+    "encrypt_database": true
+  },
+  
+  "access_control": {
+    "ip_whitelist": [],
+    "ip_blacklist": [],
+    "user_agent_filtering": true,
+    "rate_limiting_enabled": true,
+    "geolocation_filtering": false
+  },
+  
+  "data_protection": {
+    "anonymize_logs": true,
+    "encrypt_personal_data": true,
+    "data_retention_days": 90,
+    "auto_delete_old_data": true,
+    "backup_encryption": true
+  },
+  
+  "monitoring": {
+    "log_all_requests": true,
+    "detect_brute_force": true,
+    "alert_on_suspicious_activity": true,
+    "audit_log_enabled": true,
+    "real_time_monitoring": true
+  },
+  
+  "compliance": {
+    "gdpr_compliant": true,
+    "log_user_consent": true,
+    "data_portability": true,
+    "right_to_be_forgotten": true,
+    "privacy_policy_url": "https://example.com/privacy"
+  }
+}
