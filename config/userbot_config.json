@@ -1,0 +1,52 @@
+{
+  "enabled": true,
+  "api_id": 1234567,
+  "api_hash": "YOUR_API_HASH_HERE",
+  
+  "sessions": {
+    "directory": "sessions/",
+    "encryption_enabled": true,
+    "auto_rotate": true,
+    "max_sessions": 5,
+    "session_lifetime_days": 7
+  },
+  
+  "monitored_channels": [
+    "@channel_1",
+    "@channel_2",
+    "@channel_3"
+  ],
+  
+  "download_settings": {
+    "auto_download": true,
+    "file_types": ["document", "video", "audio"],
+    "max_size_mb": 2048,
+    "destination": "data/files/",
+    "organize_by_type": true
+  },
+  
+  "safety": {
+    "human_behavior": true,
+    "max_downloads_per_day": 50,
+    "delay_between_actions_seconds": [1, 5],
+    "working_hours": [9, 23],
+    "skip_weekends": false
+  },
+  
+  "proxy": {
+    "enabled": false,
+    "type": "socks5",
+    "host": "proxy.example.com",
+    "port": 1080,
+    "username": "",
+    "password": ""
+  },
+  
+  "device_info": {
+    "device_model": "iPhone 14 Pro",
+    "system_version": "iOS 16.0",
+    "app_version": "9.4",
+    "lang_code": "fa",
+    "system_lang_code": "fa-IR"
+  }
+}
