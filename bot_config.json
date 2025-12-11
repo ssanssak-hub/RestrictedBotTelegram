@@ -9,3 +9,69 @@
     "welcome_message": "به ربات ما خوش آمدید!"
   }
 }
+
+
+{
+  "enabled": true,
+  "token": "YOUR_BOT_TOKEN_HERE",
+  "api_id": 1234567,
+  "api_hash": "YOUR_API_HASH_HERE",
+  
+  "bot_settings": {
+    "parse_mode": "HTML",
+    "disable_web_page_preview": true,
+    "timeout": 30,
+    "max_connections": 100,
+    "allowed_updates": ["message", "callback_query"]
+  },
+  
+  "admins": [123456789],
+  "allowed_users": [],
+  
+  "channels": {
+    "main_channel": "@your_channel",
+    "support_channel": "@support_channel",
+    "log_channel": "@log_channel"
+  },
+  
+  "limits": {
+    "daily_downloads": 10,
+    "max_file_size_mb": 500,
+    "concurrent_downloads": 3,
+    "user_storage_gb": 1
+  },
+  
+  "features": {
+    "auto_download": true,
+    "auto_upload": true,
+    "compression": true,
+    "watermark": false,
+    "virus_scan": true
+  },
+  
+  "security": {
+    "require_join_channel": true,
+    "captcha_enabled": false,
+    "rate_limit_per_minute": 20,
+    "max_message_length": 4000
+  },
+  
+  "database": {
+    "type": "sqlite",
+    "path": "data/database.db",
+    "backup_interval_hours": 24
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "file": "logs/bot.log",
+    "max_size_mb": 10,
+    "backup_count": 5
+  },
+  
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "webhook_url": "https://yourdomain.com/webhook"
+  }
+}
