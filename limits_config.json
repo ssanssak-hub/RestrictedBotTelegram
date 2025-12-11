@@ -1,0 +1,170 @@
+{
+  "daily_downloads": {
+    "description": "تعداد دانلود روزانه هر کاربر",
+    "max_value": 10,
+    "period_seconds": 86400,
+    "reset_automatically": true,
+    "penalty_action": "block",
+    "grace_percent": 0.1,
+    "tiered_limits": {
+      "free": 10,
+      "premium": 50,
+      "vip": 1000
+    },
+    "notify_at_percent": 80
+  },
+  "total_downloads": {
+    "description": "تعداد کل دانلودهای هر کاربر",
+    "max_value": 100,
+    "period_seconds": 0,
+    "reset_automatically": false,
+    "penalty_action": "notify",
+    "grace_percent": 0.2,
+    "tiered_limits": {
+      "free": 100,
+      "premium": 10000,
+      "vip": 1000000
+    }
+  },
+  "download_size": {
+    "description": "حداکثر حجم فایل قابل دانلود (مگابایت)",
+    "max_value": 500,
+    "period_seconds": 0,
+    "reset_automatically": true,
+    "penalty_action": "block",
+    "grace_percent": 0.0,
+    "tiered_limits": {
+      "free": 500,
+      "premium": 2048,
+      "vip": 10240
+    }
+  },
+  "concurrent_downloads": {
+    "description": "تعداد دانلود همزمان",
+    "max_value": 3,
+    "period_seconds": 0,
+    "reset_automatically": true,
+    "penalty_action": "throttle",
+    "grace_percent": 0.0,
+    "tiered_limits": {
+      "free": 3,
+      "premium": 5,
+      "vip": 10
+    }
+  },
+  "user_count": {
+    "description": "حداکثر تعداد کاربران",
+    "max_value": 1000,
+    "period_seconds": 0,
+    "reset_automatically": false,
+    "penalty_action": "block",
+    "grace_percent": 0.05,
+    "notify_admins_at": 80
+  },
+  "file_count": {
+    "description": "حداکثر تعداد فایل‌ها در سیستم",
+    "max_value": 10000,
+    "period_seconds": 0,
+    "reset_automatically": false,
+    "penalty_action": "block",
+    "grace_percent": 0.05
+  },
+  "bandwidth": {
+    "description": "پهنای باند ماهانه (گیگابایت)",
+    "max_value": 100,
+    "period_seconds": 2592000,
+    "reset_automatically": true,
+    "penalty_action": "throttle",
+    "grace_percent": 0.1,
+    "tiered_limits": {
+      "free": 10,
+      "premium": 100,
+      "vip": 1000
+    },
+    "throttle_speed_mbps": 1
+  },
+  "api_requests": {
+    "description": "تعداد درخواست‌های API در دقیقه",
+    "max_value": 60,
+    "period_seconds": 60,
+    "reset_automatically": true,
+    "penalty_action": "throttle",
+    "grace_percent": 0.0
+  },
+  "storage_space": {
+    "description": "فضای ذخیره‌سازی (گیگابایت)",
+    "max_value": 50,
+    "period_seconds": 0,
+    "reset_automatically": false,
+    "penalty_action": "block",
+    "grace_percent": 0.05
+  },
+  "tier_settings": {
+    "free": {
+      "name": "رایگان",
+      "color": "blue",
+      "price_monthly": 0,
+      "price_yearly": 0,
+      "features": [
+        "۱۰ دانلود روزانه",
+        "۱۰۰ دانلود کل",
+        "حجم فایل تا ۵۰۰MB",
+        "۳ دانلود همزمان",
+        "پشتیبانی ایمیل"
+      ]
+    },
+    "premium": {
+      "name": "پریمیوم",
+      "color": "gold",
+      "price_monthly": 50000,
+      "price_yearly": 500000,
+      "features": [
+        "۵۰ دانلود روزانه",
+        "۱۰٬۰۰۰ دانلود کل",
+        "حجم فایل تا ۲GB",
+        "۵ دانلود همزمان",
+        "سرعت بالا",
+        "پشتیبانی تلگرام",
+        "آمار پیشرفته"
+      ]
+    },
+    "vip": {
+      "name": "VIP",
+      "color": "purple",
+      "price_monthly": 150000,
+      "price_yearly": 1500000,
+      "features": [
+        "دانلود روزانه نامحدود",
+        "دانلود کل نامحدود",
+        "حجم فایل نامحدود",
+        "۱۰ دانلود همزمان",
+        "سرعت بسیار بالا",
+        "اولویت در صف",
+        "پشتیبانی ۲۴/۷",
+        "آمار کامل",
+        "دسترسی زودهنگام"
+      ]
+    }
+  },
+  "grace_periods": {
+    "new_user_days": 7,
+    "after_upgrade_days": 3,
+    "warning_before_reset_hours": 24
+  },
+  "penalty_actions": {
+    "block": {
+      "duration_minutes": 60,
+      "message": "دسترسی شما به دلیل تخلف محدود شده است",
+      "notify_admin": true
+    },
+    "throttle": {
+      "speed_reduction_percent": 50,
+      "duration_minutes": 30,
+      "message": "سرعت شما کاهش یافته است"
+    },
+    "notify": {
+      "message": "شما به محدودیت نزدیک هستید",
+      "require_acknowledgment": true
+    }
+  }
+}
