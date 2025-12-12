@@ -18,7 +18,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 import statistics
-
+from config_loader import load_config
 # تنظیمات لاگ پیشرفته
 logging.basicConfig(
     level=logging.INFO,
