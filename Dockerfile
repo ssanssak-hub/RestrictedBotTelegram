@@ -48,3 +48,24 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Run the application
 CMD ["python", "main.py"]
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# نصب سیستم‌های لازم
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# کپی فایل‌ها
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# ایجاد پوشه‌های لازم
+RUN mkdir -p data downloads uploads backups cache templates static logs
+
+CMD ["python", "telegram_bot_complete.py"]
