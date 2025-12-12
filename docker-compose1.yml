@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: telegram_file_bot
+    restart: always
+    volumes:
+      - ./data:/app/data
+      - ./downloads:/app/downloads
+      - ./uploads:/app/uploads
+      - ./backups:/app/backups
+      - ./logs:/app/logs
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - bot-network
+
+  redis:
+    image: redis:alpine
+    container_name: bot_redis
+    restart: always
+    volumes:
+      - redis-data:/data
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  redis-data:
