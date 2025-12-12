@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داشبورد مدیریت ربات</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .stat-card { transition: transform 0.3s; }
+        .stat-card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-robot"></i> داشبورد مدیریت ربات
+            </span>
+        </div>
+    </nav>
+    
+    <div class="container mt-4">
+        <div class="row" id="stats-container">
+            <!-- آمار به صورت دینامیک لود می‌شود -->
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-speedometer2"></i> آمار لحظه‌ای
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>عنوان</th>
+                                        <th>مقدار</th>
+                                        <th>وضعیت</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="real-time-stats">
+                                    <!-- آمار لحظه‌ای -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                // نمایش آمار
+                document.getElementById('stats-container').innerHTML = `
+                    <div class="col-md-3">
+                        <div class="card stat-card bg-primary text-white">
+                            <div class="card-body">
+                                <h5><i class="bi bi-people"></i> کاربران</h5>
+                                <h2>${data.users.total.toLocaleString()}</h2>
+                                <p>پریمیوم: ${data.users.premium}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card bg-success text-white">
+                            <div class="card-body">
+                                <h5><i class="bi bi-file-earmark"></i> فایل‌ها</h5>
+                                <h2>${data.files.total.toLocaleString()}</h2>
+                                <p>${data.files.total_size_gb} GB</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card bg-warning text-dark">
+                            <div class="card-body">
+                                <h5><i class="bi bi-download"></i> دانلودها</h5>
+                                <h2>${data.files.total_downloads.toLocaleString()}</h2>
+                                <p>میانگین امتیاز: ${data.files.avg_rating}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card bg-info text-white">
+                            <div class="card-body">
+                                <h5><i class="bi bi-cash-coin"></i> درآمد</h5>
+                                <h2>${data.finance.revenue_30d.toLocaleString()}</h2>
+                                <p>تراکنش: ${data.finance.transactions_30d}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // آمار لحظه‌ای
+                document.getElementById('real-time-stats').innerHTML = `
+                    <tr><td>کاربران آنلاین</td><td>${data.users.active_7d}</td><td><span class="badge bg-success">فعال</span></td></tr>
+                    <tr><td>دانلود امروز</td><td>در حال محاسبه...</td><td><span class="badge bg-info">آپدیت می‌شود</span></td></tr>
+                    <tr><td>فایل‌های جدید</td><td>در حال محاسبه...</td><td><span class="badge bg-primary">آپدیت می‌شود</span></td></tr>
+                    <tr><td>سیستم</td><td>در حال اجرا</td><td><span class="badge bg-success">سالم</span></td></tr>
+                `;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        // بارگذاری اولیه
+        loadStats();
+        
+        // رفرش هر 30 ثانیه
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>
