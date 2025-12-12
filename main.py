@@ -1,3 +1,4 @@
+#main.py
 """
 Telegram Speed Download/Upload System - نسخه پیشرفته
 ویژگی‌ها:
