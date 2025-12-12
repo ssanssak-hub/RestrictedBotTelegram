@@ -11,3 +11,25 @@
     "skip_weekends": false
   }
 }
+
+{
+  "telegram_bot": {
+    "token": "YOUR_BOT_TOKEN_HERE",
+    "admin_ids": [123456789],
+    "webhook_url": ""
+  },
+  "security": {
+    "encryption_key": "change-this-to-very-secret-key-32-chars",
+    "rate_limit": 10,
+    "session_timeout": 3600
+  },
+  "performance": {
+    "max_workers": 5,
+    "max_download_speed": 10485760,
+    "max_upload_speed": 5242880
+  },
+  "database": {
+    "path": "telegram_system.db",
+    "backup_interval": 3600
+  }
+}
