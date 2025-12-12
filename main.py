@@ -40,7 +40,7 @@ from core.optimizer import IntelligentSpeedOptimizer, speed_optimizer
 from core.ai_predictor import AISpeedPredictor, ai_predictor
 from core.network_analyzer import NetworkAnalyzer
 from interfaces.api_server import APIServer
-from interfaces.telegram_ui import TelegramSpeedBot
+from bot_with_live_speed import LiveSpeedBot
 from utils.cache_manager import CacheManager
 from utils.encryption import EncryptionManager
 
