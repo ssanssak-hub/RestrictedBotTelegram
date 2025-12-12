@@ -32,6 +32,7 @@ import psutil
 import socket
 import uuid
 from contextlib import asynccontextmanager
+from config_loader import load_config
 
 # تنظیمات لاگ پیشرفته
 logging.basicConfig(
