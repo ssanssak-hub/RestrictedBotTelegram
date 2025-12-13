@@ -125,6 +125,11 @@ async def login_with_phone(manager):
     """ورود با شماره تلفن"""
     print("\n📱 ورود با شماره تلفن")
     phone = input("شماره (مثال: +989123456789): ").strip()
+    if success and client:
+        try:
+            await client.disconnect()
+        except:
+            pass
     
     if not phone:
         print("❌ شماره الزامی است")
