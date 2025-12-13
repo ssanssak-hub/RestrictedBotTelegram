@@ -4,14 +4,36 @@
 import asyncio
 import sys
 import logging
+import signal
 from pathlib import Path
+from datetime import datetime
 
-# تنظیمات logging
+# تنظیمات پیشرفته logging
+log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+log_datefmt = '%Y-%m-%d %H:%M:%S'
+
+# ایجاد پوشه logs اگر وجود ندارد
+log_dir = Path(__file__).parent / "logs"
+log_dir.mkdir(exist_ok=True)
+
+# فایل لاگ با تاریخ
+log_file = log_dir / f"bot_{datetime.now().strftime('%Y%m%d')}.log"
+
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format=log_format,
+    datefmt=log_datefmt,
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
 )
+
+# کاهش لاگ‌های کتابخانه‌های دیگر
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+logging.getLogger('telegram').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 # رفع مشکل asyncio در ویندوز
@@ -22,138 +44,300 @@ if sys.platform == "win32":
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# متغیرهای سراسری
+app = None
+bot_start_time = None
+
+async def shutdown(application):
+    """خاموش کردن امن ربات"""
+    logger.info("🔄 در حال خاموش کردن ربات...")
+    
+    try:
+        # ارسال پیام خداحافظی به ادمین (اگر تنظیم شده)
+        if application.bot_data.get('admin_id'):
+            try:
+                await application.bot.send_message(
+                    chat_id=application.bot_data['admin_id'],
+                    text="🛑 ربات در حال خاموش شدن..."
+                )
+            except Exception as e:
+                logger.warning(f"خطا در ارسال پیام خداحافظی: {e}")
+        
+        await application.stop()
+        await application.shutdown()
+        logger.info("✅ ربات با موفقیت خاموش شد")
+        
+    except Exception as e:
+        logger.error(f"❌ خطا در خاموش کردن ربات: {e}")
+
+def signal_handler(signum, frame):
+    """مدیریت سیگنال‌های توقف"""
+    logger.info(f"📡 دریافت سیگنال توقف: {signum}")
+    print("\n🛑 درخواست توقف ربات دریافت شد...")
+    
+    if app:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(shutdown(app))
+
+async def startup_message(application):
+    """ارسال پیام راه‌اندازی به ادمین"""
+    try:
+        from config import BOT_CONFIG
+        
+        if 'admin_id' in BOT_CONFIG and BOT_CONFIG['admin_id']:
+            bot_info = await application.bot.get_me()
+            start_time_str = bot_start_time.strftime('%Y-%m-%d %H:%M:%S')
+            
+            message = (
+                "✅ **ربات راه‌اندازی شد**\n\n"
+                f"🤖 نام: {bot_info.first_name}\n"
+                f"🔗 یوزرنیم: @{bot_info.username}\n"
+                f"🆔 آیدی: `{bot_info.id}`\n"
+                f"⏰ زمان شروع: {start_time_str}\n"
+                f"💻 سرور: {sys.platform}\n"
+                f"🐍 پایتون: {sys.version.split()[0]}"
+            )
+            
+            await application.bot.send_message(
+                chat_id=BOT_CONFIG['admin_id'],
+                text=message,
+                parse_mode='Markdown'
+            )
+            logger.info("✅ پیام راه‌اندازی برای ادمین ارسال شد")
+            
+    except Exception as e:
+        logger.warning(f"خطا در ارسال پیام راه‌اندازی: {e}")
+
+async def check_bot_info(application):
+    """بررسی اطلاعات ربات"""
+    try:
+        bot = await application.bot.get_me()
+        
+        # ذخیره اطلاعات در application.bot_data
+        application.bot_data['bot_info'] = {
+            'id': bot.id,
+            'username': bot.username,
+            'first_name': bot.first_name,
+            'last_name': bot.last_name,
+            'is_bot': bot.is_bot
+        }
+        
+        # بررسی اینکه آیا ربات می‌تواند پیام‌ها را بخواند
+        try:
+            await application.bot.get_updates(offset=-1, limit=1)
+            logger.info("✅ ربات قادر به دریافت آپدیت‌ها است")
+        except Exception as e:
+            logger.warning(f"⚠️ هشدار: ممکن است مشکل در اتصال باشد: {e}")
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ خطا در بررسی اطلاعات ربات: {e}")
+        return False
+
+def check_dependencies():
+    """بررسی وابستگی‌های پروژه"""
+    required_packages = {
+        'python-telegram-bot': 'telegram',
+        'httpx': 'httpx',
+        'aiohttp': 'aiohttp'
+    }
+    
+    missing_packages = []
+    installed_packages = []
+    
+    for package_name, import_name in required_packages.items():
+        try:
+            __import__(import_name)
+            installed_packages.append(package_name)
+        except ImportError:
+            missing_packages.append(package_name)
+    
+    if installed_packages:
+        print("✅ وابستگی‌های نصب شده:")
+        for pkg in installed_packages:
+            print(f"   📦 {pkg}")
+    
+    if missing_packages:
+        print("\n❌ وابستگی‌های مفقود:")
+        for pkg in missing_packages:
+            print(f"   ⚠️  {pkg}")
+        
+        print("\n🔧 برای نصب از دستور زیر استفاده کنید:")
+        print(f"   pip install {' '.join(missing_packages)}")
+        
+        # پیشنهاد نصب همه
+        all_packages = list(required_packages.keys())
+        print(f"\n💡 پیشنهاد: همه وابستگی‌ها را نصب کنید:")
+        print(f"   pip install {' '.join(all_packages)}")
+        
+        return False
+    
+    return True
+
+async def setup_bot(application):
+    """تنظیم اولیه ربات"""
+    try:
+        # ثبت سیگنال‌های توقف
+        if sys.platform != "win32":
+            signal.signal(signal.SIGTERM, signal_handler)
+            signal.signal(signal.SIGINT, signal_handler)
+        else:
+            logger.info("⚠️ سیستم عامل ویندوز - سیگنال‌ها پشتیبانی نمی‌شوند")
+        
+        # بارگذاری تنظیمات
+        from config import TOKEN, BOT_CONFIG
+        
+        # بررسی توکن
+        if not TOKEN or TOKEN.strip() == "YOUR_TOKEN_HERE":
+            logger.error("❌ توکن در config.py تنظیم نشده است")
+            return False
+            
+        if len(TOKEN) < 40:  # توکن‌های تلگرام معمولا بلند هستند
+            logger.warning("⚠️ طول توکن غیرمعمول است - ممکن است نامعتبر باشد")
+        
+        # ذخیره تنظیمات در application
+        application.bot_data['config'] = BOT_CONFIG
+        application.bot_data['admin_id'] = BOT_CONFIG.get('admin_id')
+        
+        # بررسی اطلاعات ربات
+        if not await check_bot_info(application):
+            return False
+        
+        # بارگذاری هندلرها
+        try:
+            from handlers import setup_handlers
+            await setup_handlers(application)
+            logger.info("✅ همه هندلرها ثبت شدند")
+        except ImportError as e:
+            logger.error(f"❌ خطا در بارگذاری هندلرها: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"❌ خطا در ثبت هندلرها: {e}")
+            return False
+        
+        # ارسال پیام راه‌اندازی
+        await startup_message(application)
+        
+        return True
+        
+    except ImportError as e:
+        logger.error(f"❌ خطا در بارگذاری تنظیمات: {e}")
+        print("\n📁 لطفا فایل config.py را ایجاد کنید")
+        return False
+    except Exception as e:
+        logger.error(f"❌ خطا در تنظیم اولیه: {e}")
+        return False
+
 async def main():
     """تابع اصلی اجرای ربات"""
+    global app, bot_start_time
+    
+    bot_start_time = datetime.now()
+    
     try:
-        logger.info("🤖 ربات تلگرام در حال راه‌اندازی...")
+        logger.info("="*60)
+        logger.info("🚀 شروع راه‌اندازی ربات تلگرام")
+        logger.info(f"📅 زمان شروع: {bot_start_time}")
+        logger.info(f"📁 پوشه پروژه: {PROJECT_ROOT}")
+        logger.info(f"📝 فایل لاگ: {log_file}")
+        logger.info("="*60)
         
-        # ۱. بارگذاری تنظیمات
-        try:
-            from config import TOKEN, BOT_CONFIG
-            logger.info("✅ تنظیمات بارگذاری شد")
-            
-            # بررسی اعتبار توکن
-            if not TOKEN or TOKEN == "YOUR_TOKEN_HERE":
-                logger.error("❌ توکن معتبر در config.py تنظیم نشده است")
-                print("\n⚠️  لطفا توکن ربات خود را در فایل config.py قرار دهید")
-                print("   TOKEN = 'توکن_ربات_شما'")
-                return
-                
-        except ImportError as e:
-            logger.error(f"❌ فایل config.py یافت نشد: {e}")
-            print("\n📁 لطفا فایل config.py را ایجاد کنید با محتوای زیر:")
-            print("""
-TOKEN = 'توکن_ربات_شما'
-BOT_CONFIG = {
-    'admin_id': 123456789,  # آیدی عددی ادمین
-    'log_channel': '@channel_username',  # کانال لاگ (اختیاری)
-}
-            """)
-            return
-        except Exception as e:
-            logger.error(f"❌ خطا در بارگذاری تنظیمات: {e}")
-            return
-        
-        # ۲. ایجاد اپلیکیشن تلگرام
+        # ۱. ایجاد اپلیکیشن
         try:
             from telegram.ext import ApplicationBuilder
-            from telegram import __version__ as telegram_version
-            
-            logger.info(f"📦 کتابخانه تلگرام نسخه {telegram_version}")
             
             app = ApplicationBuilder() \
                 .token(TOKEN) \
-                .pool_timeout(30) \
-                .connect_timeout(30) \
-                .read_timeout(30) \
-                .write_timeout(30) \
+                .pool_timeout(60) \
+                .connect_timeout(60) \
+                .read_timeout(60) \
+                .write_timeout(60) \
                 .build()
                 
             logger.info("✅ اپلیکیشن تلگرام ایجاد شد")
             
+        except NameError:
+            logger.error("❌ متغیر TOKEN تعریف نشده است")
+            return
         except Exception as e:
             logger.error(f"❌ خطا در ایجاد اپلیکیشن: {e}")
             return
         
-        # ۳. ثبت دستورات اصلی
-        try:
-            from handlers import setup_handlers
-            await setup_handlers(app)
-            logger.info("✅ هندلرها ثبت شدند")
-            
-            # نمایش دستورات ثبت شده
-            bot = await app.bot.get_me()
-            logger.info(f"🔗 ربات @{bot.username} آماده فعالیت است!")
-            
-            # نمایش اطلاعات در کنسول
-            print("\n" + "="*50)
-            print(f"🤖 ربات: @{bot.username}")
-            print(f"🆔 آیدی ربات: {bot.id}")
-            print(f"📛 نام ربات: {bot.first_name}")
-            print("="*50)
-            print("✅ ربات با موفقیت راه‌اندازی شد!")
-            print("📝 برای متوقف کردن ربات از Ctrl+C استفاده کنید")
-            print("="*50 + "\n")
-            
-        except ImportError:
-            logger.error("❌ پوشه handlers یافت نشد")
-            print("\n📁 پوشه handlers را ایجاد کنید و فایل __init__.py در آن قرار دهید")
+        # ۲. تنظیمات اولیه
+        if not await setup_bot(app):
+            logger.error("❌ خطا در تنظیمات اولیه ربات")
             return
-        except Exception as e:
-            logger.error(f"❌ خطا در ثبت هندلرها: {e}")
-            return
+        
+        # ۳. نمایش اطلاعات نهایی
+        bot_info = app.bot_data.get('bot_info', {})
+        runtime_info = app.bot_data.get('config', {})
+        
+        print("\n" + "="*60)
+        print("🤖 **ربات آماده فعالیت است!**")
+        print("="*60)
+        print(f"📛 نام ربات: {bot_info.get('first_name', 'نامشخص')}")
+        print(f"🔗 یوزرنیم: @{bot_info.get('username', 'نامشخص')}")
+        print(f"🆔 آیدی: {bot_info.get('id', 'نامشخص')}")
+        print(f"👤 ادمین: {runtime_info.get('admin_id', 'تنظیم نشده')}")
+        print(f"📊 کانال لاگ: {runtime_info.get('log_channel', 'تنظیم نشده')}")
+        print(f"⏰ زمان شروع: {bot_start_time.strftime('%H:%M:%S')}")
+        print("="*60)
+        print("✅ ربات با موفقیت راه‌اندازی شد!")
+        print("📡 در حال گوش دادن به پیام‌ها...")
+        print("🛑 برای توقف: Ctrl+C")
+        print("="*60 + "\n")
         
         # ۴. اجرای ربات
         try:
             await app.run_polling(
                 drop_pending_updates=True,
-                allowed_updates=["message", "callback_query", "inline_query"]
+                allowed_updates=[
+                    "message", 
+                    "callback_query", 
+                    "inline_query",
+                    "chat_member",
+                    "my_chat_member"
+                ],
+                close_loop=False
             )
             
         except KeyboardInterrupt:
-            logger.info("🛑 توقف ربات توسط کاربر")
-            print("\n🛑 ربات متوقف شد")
+            logger.info("🛑 توقف ربات توسط کاربر (Ctrl+C)")
         except Exception as e:
-            logger.error(f"⚠️ خطا در حین اجرای ربات: {e}")
+            logger.error(f"⚠️ خطا در حین اجرای ربات: {e}", exc_info=True)
             raise
             
     except Exception as e:
-        logger.critical(f"💥 خطای بحرانی در اجرای ربات: {e}")
+        logger.critical(f"💥 خطای بحرانی در اجرای ربات: {e}", exc_info=True)
         print(f"\n❌ خطای بحرانی: {e}")
-        return
-
-def check_dependencies():
-    """بررسی وابستگی‌های پروژه"""
-    required_packages = ['python-telegram-bot', 'pathlib']
-    missing_packages = []
-    
-    for package in required_packages:
-        try:
-            __import__(package.replace('-', '_'))
-        except ImportError:
-            missing_packages.append(package)
-    
-    if missing_packages:
-        print("\n❌ برخی وابستگی‌ها نصب نیستند:")
-        for pkg in missing_packages:
-            print(f"   - {pkg}")
-        print("\n📦 برای نصب از دستور زیر استفاده کنید:")
-        print(f"   pip install {' '.join(missing_packages)}")
-        return False
-    
-    return True
+        
+    finally:
+        # پاکسازی منابع
+        if app:
+            await shutdown(app)
+        
+        end_time = datetime.now()
+        runtime = end_time - bot_start_time
+        
+        logger.info(f"⏱️ مدت زمان اجرا: {runtime}")
+        logger.info("👋 خداحافظ!")
+        print(f"\n⏱️ مدت زمان اجرا: {runtime}")
+        print("👋 خداحافظ!")
 
 if __name__ == "__main__":
-    print("🔍 بررسی وابستگی‌ها...")
+    print("🔍 بررسی وابستگی‌ها و تنظیمات...")
+    print("="*50)
     
     if check_dependencies():
-        # اجرای ربات
         try:
             asyncio.run(main())
         except KeyboardInterrupt:
-            print("\n👋 خداحافظ!")
+            print("\n\n🛑 ربات توسط کاربر متوقف شد")
         except Exception as e:
-            logger.error(f"💥 خطای غیرمنتظره: {e}")
-            print(f"\n⚠️ خطای غیرمنتظره رخ داد. لطفا لاگ‌ها را بررسی کنید.")
+            print(f"\n❌ خطای غیرمنتظره: {e}")
+            logger.critical(f"خطای غیرمنتظره: {e}", exc_info=True)
     else:
+        print("\n❌ لطفا وابستگی‌ها را نصب کنید و دوباره تلاش کنید")
         sys.exit(1)
