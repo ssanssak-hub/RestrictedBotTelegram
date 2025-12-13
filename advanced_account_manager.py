@@ -767,9 +767,8 @@ class AdvancedAccountManager:
             logger.error(f"خطای ناشناخته در ورود: {e}")
             return False, None, f"خطای سیستمی: {str(e)}"
     
-    async def login_with_qr_code(self) -> Tuple[bool, Optional[TelegramClient], Optional[str]]:
-        """ورود با QR Code"""
-        return await self.login_with_qr()  # یا مستقیماً کد را بنویسید
+    async def login_with_qr(self) -> Tuple[bool, Optional[TelegramClient], Optional[str]]:
+        """ورود با QR Code - متد اصلی"""
         try:
             session_name = self._generate_session_name("qr_login")
             session_path = self.directories['sessions'] / f"{session_name}.session"
@@ -814,6 +813,10 @@ class AdvancedAccountManager:
         except Exception as e:
             logger.error(f"خطا در ورود QR: {e}")
             return False, None, f"خطا در ورود QR: {str(e)}"
+    
+    async def login_with_qr_code(self) -> Tuple[bool, Optional[TelegramClient], Optional[str]]:
+        """ورود با QR Code - سازگار با main.py"""
+        return await self.login_with_qr()
     
     # ========== سیستم چند اکانتی ==========
     
