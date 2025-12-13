@@ -938,18 +938,6 @@ class AdvancedAccountManager:
                 'success': False,
                 'error': str(e)
             }, status=500)
-    
-    @web.middleware
-    async def auth_middleware(self, request, handler):
-        """Middleware برای احراز هویت"""
-        # احراز هویت ساده - در پروژه واقعی باید پیچیده‌تر باشد
-        auth_header = request.headers.get('Authorization')
-        
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return web.json_response({
-                'success': False,
-                'error': 'دسترسی غیرمجاز'
-            }, status=401)
         
         # ادامه پردازش
         return await handler(request)
