@@ -1099,6 +1099,77 @@ class AdvancedAccountManager:
         except Exception as e:
             logger.error(f"خطا در تغییر کلید: {e}")
             return False
+
+    async def _check_session_security(self, account_data: Dict) -> Dict[str, Any]:
+        """بررسی امنیت session"""
+        try:
+            client = account_data.get('client')
+            if not client:
+                return {'check': 'session', 'score': 0, 'message': 'کلاینت وجود ندارد'}
+            
+            session_file = self.directories['sessions'] / f"{account_data.get('session_name')}.session"
+            encrypted_file = self.directories['encrypted'] / f"{account_data.get('session_name')}.enc"
+            
+            score = 50  # امتیاز پایه
+            
+            # بررسی وجود session رمزنگاری شده
+            if encrypted_file.exists():
+                score += 30
+            
+            # بررسی تاریخ‌چه session
+            if session_file.exists():
+                import os
+                file_age = datetime.now().timestamp() - os.path.getmtime(session_file)
+                if file_age < 86400:  # کمتر از 24 ساعت
+                    score += 20
+            
+            return {
+                'check': 'session_security',
+                'score': min(score, 100),
+                'message': f'امتیاز امنیت session: {score}/100'
+            }
+        except Exception as e:
+            return {'check': 'session', 'score': 0, 'message': f'خطا: {str(e)}'}
+    
+    async def _check_suspicious_activity(self, account_id: str) -> Dict[str, Any]:
+        """بررسی فعالیت‌های مشکوک"""
+        try:
+            # اینجا می‌توانید لاگ‌ها را از دیتابیس بررسی کنید
+            score = 80  # امتیاز اولیه
+            
+            # شبیه‌سازی: اگر account_id شامل 'test' باشد، امتیاز کم کنید
+            if 'test' in account_id.lower():
+                score -= 30
+            
+            return {
+                'check': 'suspicious_activity',
+                'score': max(score, 0),
+                'message': f'امتیاز فعالیت: {score}/100'
+            }
+        except Exception as e:
+            return {'check': 'activity', 'score': 0, 'message': f'خطا: {str(e)}'}
+    
+    async def _check_security_settings(self, account_data: Dict) -> Dict[str, Any]:
+        """بررسی تنظیمات امنیتی"""
+        try:
+            score = 70  # امتیاز اولیه
+            info = account_data.get('info', {})
+            
+            # بررسی 2FA
+            if info.get('login_method') == LoginMethod.PASSWORD.value:
+                score += 20
+            
+            # بررسی اکانت پریمیوم
+            if info.get('is_premium'):
+                score += 10
+            
+            return {
+                'check': 'security_settings',
+                'score': min(score, 100),
+                'message': f'امتیاز تنظیمات: {score}/100'
+            }
+        except Exception as e:
+            return {'check': 'settings', 'score': 0, 'message': f'خطا: {str(e)}'}    
     
     # ========== API و Webhook ==========
     
