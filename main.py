@@ -5,6 +5,8 @@ import asyncio
 import sys
 import logging
 import signal
+import os
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -48,6 +50,20 @@ sys.path.insert(0, str(PROJECT_ROOT))
 app = None
 bot_start_time = None
 
+async def cleanup_temp_data(application):
+    """پاکسازی داده‌های موقت"""
+    try:
+        # پاکسازی داده‌های موقت
+        temp_data = [k for k in application.bot_data.keys() if k.startswith('temp_')]
+        for key in temp_data:
+            application.bot_data.pop(key, None)
+        
+        logger.info(f"🧹 پاکسازی داده‌های موقت: {len(temp_data)} مورد")
+        return True
+    except Exception as e:
+        logger.error(f"خطا در پاکسازی داده‌های موقت: {e}")
+        return False
+
 async def shutdown(application):
     """خاموش کردن امن ربات"""
     logger.info("🔄 در حال خاموش کردن ربات...")
@@ -70,6 +86,22 @@ async def shutdown(application):
     except Exception as e:
         logger.error(f"❌ خطا در خاموش کردن ربات: {e}")
 
+async def graceful_shutdown(application):
+    """خاموش کردن ملایم با انتظار برای تکمیل کارها"""
+    logger.info("⏳ در حال تکمیل کارهای جاری...")
+    
+    # منتظر ماندن برای تکمیل کارهای در حال اجرا
+    start_time = time.time()
+    timeout = 30  # 30 ثانیه
+    
+    while application.update_queue.qsize() > 0:
+        if time.time() - start_time > timeout:
+            logger.warning("⏰ زمان انتظار برای تکمیل کارها به پایان رسید")
+            break
+        await asyncio.sleep(1)
+    
+    await shutdown(application)
+
 def signal_handler(signum, frame):
     """مدیریت سیگنال‌های توقف"""
     logger.info(f"📡 دریافت سیگنال توقف: {signum}")
@@ -78,7 +110,7 @@ def signal_handler(signum, frame):
     if app:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            loop.create_task(shutdown(app))
+            loop.create_task(graceful_shutdown(app))
 
 async def startup_message(application):
     """ارسال پیام راه‌اندازی به ادمین"""
@@ -176,6 +208,88 @@ def check_dependencies():
     
     return True
 
+async def health_check(application):
+    """بررسی سلامت ربات در حین اجرا"""
+    try:
+        # بررسی اتصال به API تلگرام
+        await application.bot.get_me()
+        
+        # بررسی حافظه
+        try:
+            import psutil
+            memory = psutil.virtual_memory()
+            memory_percent = memory.percent
+        except ImportError:
+            memory_percent = 0
+        
+        health_status = {
+            "status": "healthy",
+            "uptime": str(datetime.now() - bot_start_time),
+            "memory_percent": memory_percent,
+            "queue_size": application.update_queue.qsize(),
+            "last_update": datetime.now().isoformat()
+        }
+        
+        application.bot_data['health'] = health_status
+        return health_status
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {"status": "unhealthy", "error": str(e)}
+
+async def periodic_tasks(application):
+    """وظایف دوره‌ای در پس‌زمینه"""
+    while True:
+        try:
+            # هر 10 دقیقه اجرا شود
+            await asyncio.sleep(600)
+            
+            # لاگ آمار
+            logger.info(f"📊 آمار صف: {application.update_queue.qsize()}")
+            
+            # Health check خودکار
+            health_status = await health_check(application)
+            if health_status["status"] == "unhealthy":
+                logger.warning(f"⚠️ وضعیت سلامت ربات: {health_status}")
+            
+            # Cleanup temporary data
+            await cleanup_temp_data(application)
+            
+        except asyncio.CancelledError:
+            logger.info("وظایف دوره‌ای متوقف شد")
+            break
+        except Exception as e:
+            logger.error(f"خطا در وظایف دوره‌ای: {e}")
+
+def check_environment():
+    """بررسی محیط اجرا"""
+    env_vars = ['TOKEN', 'ADMIN_ID']  # متغیرهای محیطی ضروری
+    
+    missing = []
+    for var in env_vars:
+        if not os.getenv(var):
+            missing.append(var)
+    
+    if missing:
+        logger.warning(f"⚠️ متغیرهای محیطی گمشده: {missing}")
+        print("💡 نکته: می‌توانید از فایل .env استفاده کنید")
+        return False
+    return True
+
+def setup_test_mode(application):
+    """تنظیمات حالت تست"""
+    if os.getenv('BOT_ENV') == 'test':
+        logger.info("🧪 حالت تست فعال شد")
+        application.bot_data['test_mode'] = True
+        
+        # غیرفعال کردن برخی قابلیت‌ها در تست
+        application.bot_data['send_notifications'] = False
+        
+        # تغییرات برای تست
+        logger.info("🔧 تغییرات حالت تست اعمال شد")
+        return True
+    return False
+
 async def setup_bot(application):
     """تنظیم اولیه ربات"""
     try:
@@ -200,6 +314,9 @@ async def setup_bot(application):
         # ذخیره تنظیمات در application
         application.bot_data['config'] = BOT_CONFIG
         application.bot_data['admin_id'] = BOT_CONFIG.get('admin_id')
+        
+        # تنظیم حالت تست (اگر نیاز باشد)
+        setup_test_mode(application)
         
         # بررسی اطلاعات ربات
         if not await check_bot_info(application):
@@ -230,95 +347,6 @@ async def setup_bot(application):
         logger.error(f"❌ خطا در تنظیم اولیه: {e}")
         return False
 
-async def graceful_shutdown(application):
-    """خاموش کردن ملایم با انتظار برای تکمیل کارها"""
-    logger.info("⏳ در حال تکمیل کارهای جاری...")
-    
-    # منتظر ماندن برای تکمیل کارهای در حال اجرا
-    import time
-    start_time = time.time()
-    timeout = 30  # 30 ثانیه
-    
-    while application.update_queue.qsize() > 0:
-        if time.time() - start_time > timeout:
-            logger.warning("⏰ زمان انتظار برای تکمیل کارها به پایان رسید")
-            break
-        await asyncio.sleep(1)
-    
-    await shutdown(application)
-
-async def health_check(application):
-    """بررسی سلامت ربات در حین اجرا"""
-    try:
-        # بررسی اتصال به API تلگرام
-        await application.bot.get_me()
-        
-        # بررسی حافظه
-        import psutil
-        memory = psutil.virtual_memory()
-        
-        health_status = {
-            "status": "healthy",
-            "uptime": str(datetime.now() - bot_start_time),
-            "memory_percent": memory.percent,
-            "queue_size": application.update_queue.qsize(),
-            "last_update": datetime.now().isoformat()
-        }
-        
-        application.bot_data['health'] = health_status
-        return health_status
-        
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {"status": "unhealthy", "error": str(e)}
-
-async def periodic_tasks(application):
-    """وظایف دوره‌ای در پس‌زمینه"""
-    while True:
-        try:
-            # هر 10 دقیقه اجرا شود
-            await asyncio.sleep(600)
-            
-            # لاگ آمار
-            logger.info(f"📊 آمار صف: {application.update_queue.qsize()}")
-            
-            # Health check خودکار
-            await health_check(application)
-            
-            # Cleanup temporary data
-            await cleanup_temp_data(application)
-            
-        except Exception as e:
-            logger.error(f"خطا در وظایف دوره‌ای: {e}")
-
-def check_environment():
-    """بررسی محیط اجرا"""
-    env_vars = ['TOKEN', 'ADMIN_ID']  # متغیرهای محیطی ضروری
-    
-    missing = []
-    for var in env_vars:
-        if not os.getenv(var):
-            missing.append(var)
-    
-    if missing:
-        logger.warning(f"⚠️ متغیرهای محیطی گمشده: {missing}")
-        print("💡 نکته: می‌توانید از فایل .env استفاده کنید")
-        return False
-    return True
-
-# برای تست ربات در حالت توسعه
-def setup_test_mode(application):
-    """تنظیمات حالت تست"""
-    if os.getenv('BOT_ENV') == 'test':
-        logger.info("🧪 حالت تست فعال شد")
-        application.bot_data['test_mode'] = True
-        
-        # غیرفعال کردن برخی قابلیت‌ها در تست
-        application.bot_data['send_notifications'] = False
-        
-        # تغییرات برای تست
-        logger.info("🔧 تغییرات حالت تست اعمال شد")
-
 async def main():
     """تابع اصلی اجرای ربات"""
     global app, bot_start_time
@@ -336,6 +364,7 @@ async def main():
         # ۱. ایجاد اپلیکیشن
         try:
             from telegram.ext import ApplicationBuilder
+            from config import TOKEN
             
             app = ApplicationBuilder() \
                 .token(TOKEN) \
@@ -358,6 +387,13 @@ async def main():
         if not await setup_bot(app):
             logger.error("❌ خطا در تنظیمات اولیه ربات")
             return
+        
+        # راه‌اندازی وظایف دوره‌ای در پس‌زمینه
+        try:
+            periodic_task = asyncio.create_task(periodic_tasks(app))
+            logger.info("✅ وظایف دوره‌ای راه‌اندازی شدند")
+        except Exception as e:
+            logger.warning(f"⚠️ خطا در راه‌اندازی وظایف دوره‌ای: {e}")
         
         # ۳. نمایش اطلاعات نهایی
         bot_info = app.bot_data.get('bot_info', {})
@@ -394,6 +430,9 @@ async def main():
             
         except KeyboardInterrupt:
             logger.info("🛑 توقف ربات توسط کاربر (Ctrl+C)")
+            # لغو وظایف دوره‌ای
+            if 'periodic_task' in locals():
+                periodic_task.cancel()
         except Exception as e:
             logger.error(f"⚠️ خطا در حین اجرای ربات: {e}", exc_info=True)
             raise
@@ -405,7 +444,7 @@ async def main():
     finally:
         # پاکسازی منابع
         if app:
-            await shutdown(app)
+            await graceful_shutdown(app)
         
         end_time = datetime.now()
         runtime = end_time - bot_start_time
@@ -418,6 +457,9 @@ async def main():
 if __name__ == "__main__":
     print("🔍 بررسی وابستگی‌ها و تنظیمات...")
     print("="*50)
+    
+    # بررسی محیط (اختیاری)
+    # check_environment()
     
     if check_dependencies():
         try:
