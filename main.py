@@ -230,6 +230,95 @@ async def setup_bot(application):
         logger.error(f"❌ خطا در تنظیم اولیه: {e}")
         return False
 
+async def graceful_shutdown(application):
+    """خاموش کردن ملایم با انتظار برای تکمیل کارها"""
+    logger.info("⏳ در حال تکمیل کارهای جاری...")
+    
+    # منتظر ماندن برای تکمیل کارهای در حال اجرا
+    import time
+    start_time = time.time()
+    timeout = 30  # 30 ثانیه
+    
+    while application.update_queue.qsize() > 0:
+        if time.time() - start_time > timeout:
+            logger.warning("⏰ زمان انتظار برای تکمیل کارها به پایان رسید")
+            break
+        await asyncio.sleep(1)
+    
+    await shutdown(application)
+
+async def health_check(application):
+    """بررسی سلامت ربات در حین اجرا"""
+    try:
+        # بررسی اتصال به API تلگرام
+        await application.bot.get_me()
+        
+        # بررسی حافظه
+        import psutil
+        memory = psutil.virtual_memory()
+        
+        health_status = {
+            "status": "healthy",
+            "uptime": str(datetime.now() - bot_start_time),
+            "memory_percent": memory.percent,
+            "queue_size": application.update_queue.qsize(),
+            "last_update": datetime.now().isoformat()
+        }
+        
+        application.bot_data['health'] = health_status
+        return health_status
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {"status": "unhealthy", "error": str(e)}
+
+async def periodic_tasks(application):
+    """وظایف دوره‌ای در پس‌زمینه"""
+    while True:
+        try:
+            # هر 10 دقیقه اجرا شود
+            await asyncio.sleep(600)
+            
+            # لاگ آمار
+            logger.info(f"📊 آمار صف: {application.update_queue.qsize()}")
+            
+            # Health check خودکار
+            await health_check(application)
+            
+            # Cleanup temporary data
+            await cleanup_temp_data(application)
+            
+        except Exception as e:
+            logger.error(f"خطا در وظایف دوره‌ای: {e}")
+
+def check_environment():
+    """بررسی محیط اجرا"""
+    env_vars = ['TOKEN', 'ADMIN_ID']  # متغیرهای محیطی ضروری
+    
+    missing = []
+    for var in env_vars:
+        if not os.getenv(var):
+            missing.append(var)
+    
+    if missing:
+        logger.warning(f"⚠️ متغیرهای محیطی گمشده: {missing}")
+        print("💡 نکته: می‌توانید از فایل .env استفاده کنید")
+        return False
+    return True
+
+# برای تست ربات در حالت توسعه
+def setup_test_mode(application):
+    """تنظیمات حالت تست"""
+    if os.getenv('BOT_ENV') == 'test':
+        logger.info("🧪 حالت تست فعال شد")
+        application.bot_data['test_mode'] = True
+        
+        # غیرفعال کردن برخی قابلیت‌ها در تست
+        application.bot_data['send_notifications'] = False
+        
+        # تغییرات برای تست
+        logger.info("🔧 تغییرات حالت تست اعمال شد")
+
 async def main():
     """تابع اصلی اجرای ربات"""
     global app, bot_start_time
