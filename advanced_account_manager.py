@@ -570,7 +570,16 @@ class AdvancedAccountManager:
             'temp': base_dir / "temp",
             'exports': base_dir / "exports"
         }
-        
+                     
+        # سیستم احراز هویت پیشرفته
+        self.auth_system = AdvancedAuthMiddleware(
+            jwt_secret=config.get('jwt_secret', secrets.token_urlsafe(64)),
+            token_expiry_hours=config.get('token_expiry_hours', 24),
+            rate_limit_per_minute=config.get('rate_limit', 100),
+            allowed_ips=config.get('allowed_ips'),
+            blocked_ips=config.get('blocked_ips', [])
+        )
+
         for name, path in self.directories.items():
             path.mkdir(parents=True, exist_ok=True, mode=0o700)
         
