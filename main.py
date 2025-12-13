@@ -382,7 +382,9 @@ class IntegratedBotManager:
             base_dir=Path("accounts"),
             api_id=api_id,
             api_hash=api_hash,
-            encryption_key=os.getenv("ENCRYPTION_KEY", "default_encryption_key")
+            encryption_key = os.getenv("ENCRYPTION_KEY")
+            if not encryption_key:
+                raise ValueError("ENCRYPTION_KEY not set in environment")
         )
         
         # 2. ویژگی‌های پیشرفته (از main.py)
