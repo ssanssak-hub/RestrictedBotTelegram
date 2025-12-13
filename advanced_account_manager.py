@@ -2192,6 +2192,224 @@ class AdvancedAuthMiddleware:
                 'timestamp': datetime.now().isoformat()
             }, status=500)
 
+# در کلاس AdvancedAccountManager، بعد از متدهای helper و قبل از start_api_server:
+
+    # ========== Middleware‌های پیشرفته ==========
+    
+    @web.middleware
+    async def auth_middleware(self, request: web.Request, handler):
+        """Middleware احراز هویت پیشرفته"""
+        # مسیرهای عمومی که نیاز به احراز هویت ندارند
+        public_paths = [
+            '/api/auth/login',
+            '/api/auth/register',
+            '/api/auth/verify',
+            '/api/system/status',
+            '/'
+        ]
+        
+        # بررسی اگر مسیر عمومی است
+        if request.path in public_paths:
+            return await handler(request)
+        
+        # احراز هویت برای مسیرهای خصوصی
+        auth_header = request.headers.get('Authorization')
+        
+        if not auth_header or not auth_header.startswith('Bearer '):
+            logger.warning(f"دسترسی غیرمجاز به {request.path} - توکن ارائه نشده")
+            return web.json_response({
+                'success': False,
+                'error': 'دسترسی غیرمجاز. توکن احراز هویت مورد نیاز است.',
+                'code': 'AUTH_TOKEN_REQUIRED'
+            }, status=401)
+        
+        token = auth_header[7:]
+        
+        # اعتبارسنجی توکن
+        is_valid, user_data = await self.validate_auth_token(token)
+        
+        if not is_valid:
+            logger.warning(f"توکن نامعتبر برای دسترسی به {request.path}")
+            return web.json_response({
+                'success': False,
+                'error': 'توکن نامعتبر یا منقضی شده است.',
+                'code': 'INVALID_TOKEN'
+            }, status=401)
+        
+        # بررسی دسترسی کاربر
+        if not self.check_user_permission(user_data, request.method, request.path):
+            logger.warning(f"دسترسی غیرمجاز کاربر {user_data.get('username')} به {request.path}")
+            return web.json_response({
+                'success': False,
+                'error': 'شما دسترسی لازم برای این عملیات را ندارید.',
+                'code': 'PERMISSION_DENIED'
+            }, status=403)
+        
+        # اضافه کردن اطلاعات کاربر به request
+        request['user'] = user_data
+        request['token'] = token
+        
+        # لاگ دسترسی موفق
+        logger.info(f"دسترسی مجاز: {user_data.get('username')} -> {request.method} {request.path}")
+        
+        return await handler(request)
+    
+    @web.middleware
+    async def logging_middleware(self, request: web.Request, handler):
+        """Middleware برای لاگ‌گیری درخواست‌ها"""
+        start_time = time.time()
+        request_id = secrets.token_hex(8)
+        
+        # اطلاعات درخواست
+        ip = request.remote
+        method = request.method
+        path = request.path
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        
+        # لاگ شروع درخواست
+        logger.info(f"[{request_id}] {method} {path} از {ip} - User-Agent: {user_agent}")
+        
+        # اضافه کردن request_id به request
+        request['request_id'] = request_id
+        
+        try:
+            response = await handler(request)
+            
+            # محاسبه زمان پردازش
+            processing_time = time.time() - start_time
+            
+            # لاگ پایان درخواست
+            logger.info(f"[{request_id}] پاسخ {response.status} در {processing_time:.3f}ثانیه")
+            
+            # اضافه کردن هدرهای مفید
+            response.headers['X-Request-ID'] = request_id
+            response.headers['X-Processing-Time'] = f"{processing_time:.3f}"
+            
+            return response
+            
+        except Exception as e:
+            # لاگ خطا
+            logger.error(f"[{request_id}] خطا در پردازش: {str(e)}")
+            raise
+    
+    @web.middleware
+    async def cors_middleware(self, request: web.Request, handler):
+        """Middleware برای پشتیبانی از CORS"""
+        if request.method == 'OPTIONS':
+            # پاسخ به preflight requests
+            response = web.Response()
+        else:
+            response = await handler(request)
+        
+        # اضافه کردن هدرهای CORS
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Request-ID'
+        response.headers['Access-Control-Expose-Headers'] = 'X-Request-ID, X-Processing-Time'
+        
+        return response
+    
+    @web.middleware
+    async def error_handling_middleware(self, request: web.Request, handler):
+        """Middleware برای مدیریت خطاها"""
+        try:
+            return await handler(request)
+            
+        except web.HTTPException as e:
+            # خطاهای HTTP شناخته شده
+            logger.warning(f"HTTP Exception: {e.status} - {e.reason}")
+            return web.json_response({
+                'success': False,
+                'error': e.reason,
+                'status': e.status,
+                'path': request.path
+            }, status=e.status)
+            
+        except Exception as e:
+            # خطاهای عمومی
+            logger.error(f"خطای غیرمنتظره در {request.path}: {str(e)}")
+            
+            # عدم افشای جزئیات خطا به کاربر
+            return web.json_response({
+                'success': False,
+                'error': 'خطای داخلی سرور',
+                'request_id': request.get('request_id', 'unknown'),
+                'timestamp': datetime.now().isoformat()
+            }, status=500)
+    
+    # ========== متدهای کمکی احراز هویت ==========
+    
+    async def validate_auth_token(self, token: str) -> Tuple[bool, Dict]:
+        """اعتبارسنجی توکن JWT"""
+        try:
+            # استفاده از کتابخانه PyJWT
+            import jwt
+            
+            # در پروژه واقعی، کلید باید از config خوانده شود
+            secret_key = self.auth_config.get('jwt_secret', 'your-secret-key-change-in-production')
+            
+            payload = jwt.decode(
+                token,
+                secret_key,
+                algorithms=['HS256'],
+                options={'verify_exp': True}
+            )
+            
+            return True, payload
+            
+        except jwt.ExpiredSignatureError:
+            return False, {'error': 'توکن منقضی شده است'}
+        except jwt.InvalidTokenError:
+            return False, {'error': 'توکن نامعتبر است'}
+        except Exception as e:
+            logger.error(f"خطا در اعتبارسنجی توکن: {e}")
+            return False, {'error': str(e)}
+    
+    def check_user_permission(self, user_data: Dict, method: str, path: str) -> bool:
+        """بررسی دسترسی کاربر"""
+        role = user_data.get('role', 'user')
+        user_permissions = user_data.get('permissions', [])
+        
+        # نقش‌های ادمین دسترسی کامل دارند
+        if role in ['super_admin', 'admin']:
+            return True
+        
+        # نقش‌های مدیر دسترسی محدود
+        if role == 'manager':
+            allowed_paths = [
+                '/api/accounts',
+                '/api/accounts/login',
+                '/api/accounts/*/status',
+                '/api/accounts/*/backup'
+            ]
+            return any(self._match_path_pattern(path, pattern) for pattern in allowed_paths)
+        
+        # کاربران عادی
+        if role == 'user':
+            allowed_paths = [
+                '/api/accounts',
+                '/api/accounts/*/status'
+            ]
+            return any(self._match_path_pattern(path, pattern) for pattern in allowed_paths)
+        
+        return False
+    
+    def _match_path_pattern(self, path: str, pattern: str) -> bool:
+        """مقایسه مسیر با الگو"""
+        if pattern.endswith('*'):
+            return path.startswith(pattern[:-1])
+        return path == pattern
+    
+    def _setup_cors(self, app):
+        """تنظیمات CORS پیشرفته"""
+        pass  # تنظیمات اضافی CORS
+    
+    def _setup_static_files(self, app):
+        """تنظیمات فایل‌های استاتیک"""
+        # اگر داشبورد وب دارید
+        # app.router.add_static('/static/', 'static/')
+        pass    
+
     # ========== متدهای احراز هویت پیشرفته ==========
     
     async def _authenticate_request(self, request: web.Request) -> Dict:
