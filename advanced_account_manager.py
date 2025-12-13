@@ -594,7 +594,7 @@ class AdvancedAccountManager:
     async def login_with_phone_advanced(
         self,
         phone: str,
-        session_name: Optional[str] = None,
+        session_name: Optional[str] = None,  # ✅ باید Optional باشد
         use_proxy: bool = False,
         enable_2fa: bool = True,
         device_info: Optional[Dict] = None
