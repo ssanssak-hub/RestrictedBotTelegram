@@ -330,3 +330,49 @@ if __name__ == "__main__":
     errors = manager.validate_required_fields()
     if errors:
         print(f"⚠️  Warnings: {errors}")
+
+# config.py - فایل تنظیمات
+import os
+from pathlib import Path
+
+# توکن ربات
+TOKEN = os.getenv("BOT_TOKEN", "توکن_ربات_شما")
+
+# اطلاعات API تلگرام
+API_ID = int(os.getenv("API_ID", 123456))
+API_HASH = os.getenv("API_HASH", "your_api_hash_here")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "username_bot")
+
+# ادمین‌ها (آیدی عددی)
+ADMIN_IDS = [int(id.strip()) for id in os.getenv("ADMIN_IDS", "123456789").split(",")]
+
+# کلید رمزنگاری
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "default_key_32_chars_long_here!")
+
+# تنظیمات Redis (برای کش)
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
+
+# تنظیمات Webhook (اختیاری)
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+WEBHOOK_PORT = int(os.getenv("PORT", 8443))
+WEBHOOK_LISTEN = os.getenv("WEBHOOK_LISTEN", "0.0.0.0")
+
+# محدودیت‌ها
+MAX_DOWNLOAD_LIMIT = int(os.getenv("MAX_DOWNLOAD_LIMIT", 50))
+MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 500))
+DAILY_DOWNLOAD_LIMIT = int(os.getenv("DAILY_DOWNLOAD_LIMIT", 20))
+
+# مسیرهای فایل
+BASE_DIR = Path(__file__).parent
+DATABASE_PATH = BASE_DIR / "database" / "telegram_bot.db"
+LOGS_PATH = BASE_DIR / "logs"
+DOWNLOAD_PATH = BASE_DIR / "downloads"
+EXPORTS_PATH = BASE_DIR / "exports"
+ACCOUNTS_PATH = BASE_DIR / "accounts"
+
+# ایجاد دایرکتوری‌ها
+for path in [DATABASE_PATH.parent, LOGS_PATH, DOWNLOAD_PATH, EXPORTS_PATH, ACCOUNTS_PATH]:
+    path.mkdir(parents=True, exist_ok=True)
