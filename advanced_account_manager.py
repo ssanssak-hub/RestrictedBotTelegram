@@ -1502,6 +1502,120 @@ class AccountDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(timestamp)')
         
         self.conn.commit()
+        
+    async def update_account_status(self, session_name: str, status: AccountStatus, wait_seconds: int = 0):
+        """به‌روزرسانی وضعیت اکانت"""
+        try:
+            cursor = self.conn.cursor()
+            if status == AccountStatus.FLOOD_WAIT:
+                # ذخیره flood wait
+                wait_until = datetime.now() + timedelta(seconds=wait_seconds)
+                cursor.execute('''
+                    INSERT OR REPLACE INTO flood_waits (phone, wait_until, wait_seconds, reason)
+                    VALUES (?, ?, ?, ?)
+                ''', (session_name, wait_until, wait_seconds, 'flood_wait'))
+            else:
+                # به‌روزرسانی وضعیت اکانت
+                cursor.execute('''
+                    UPDATE accounts SET status = ? WHERE session_name = ?
+                ''', (status.value, session_name))
+            
+            self.conn.commit()
+        except Exception as e:
+            logger.error(f"خطا در به‌روزرسانی وضعیت: {e}")
+    
+    async def get_flood_wait_status(self, phone: str) -> Dict[str, Any]:
+        """بررسی وضعیت flood wait"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT wait_until FROM flood_waits WHERE phone = ?', (phone,))
+            result = cursor.fetchone()
+            
+            if result:
+                wait_until = datetime.fromisoformat(result[0])
+                remaining = (wait_until - datetime.now()).seconds
+                return {
+                    'in_flood': remaining > 0,
+                    'remaining': max(0, remaining)
+                }
+        except Exception as e:
+            logger.error(f"خطا در بررسی flood wait: {e}")
+        
+        return {'in_flood': False, 'remaining': 0}
+    
+    async def get_recent_login_attempts(self, phone: str, minutes: int = 5) -> List[Dict]:
+        """دریافت تلاش‌های ورود اخیر"""
+        try:
+            cursor = self.conn.cursor()
+            cutoff = datetime.now() - timedelta(minutes=minutes)
+            cursor.execute('''
+                SELECT * FROM login_attempts 
+                WHERE phone = ? AND timestamp > ?
+                ORDER BY timestamp DESC
+            ''', (phone, cutoff))
+            
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"خطا در دریافت تلاش‌های ورود: {e}")
+            return []
+    
+    async def get_account_by_session(self, session_name: str) -> Optional[Dict]:
+        """دریافت اکانت براساس session name"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT * FROM accounts WHERE session_name = ?', (session_name,))
+            result = cursor.fetchone()
+            
+            if result:
+                columns = [desc[0] for desc in cursor.description]
+                return dict(zip(columns, result))
+        except Exception as e:
+            logger.error(f"خطا در دریافت اکانت: {e}")
+        
+        return None
+    
+    async def save_account(self, account_info: AccountInfo):
+        """ذخیره اکانت در دیتابیس"""
+        try:
+            cursor = self.conn.cursor()
+            account_dict = account_info.to_dict()
+            
+            # تبدیل به tuple برای SQL
+            values = tuple(account_dict.values())
+            
+            cursor.execute('''
+                INSERT OR REPLACE INTO accounts 
+                (account_id, session_name, user_id, username, first_name, last_name, 
+                 phone, phone_hash, is_bot, is_premium, status, login_method, 
+                 created_at, last_login, last_activity, total_messages, 
+                 total_downloads, security_score, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', values)
+            
+            self.conn.commit()
+            logger.debug(f"اکانت {account_info.account_id} ذخیره شد")
+        except Exception as e:
+            logger.error(f"خطا در ذخیره اکانت: {e}")
+    
+    async def log_login_attempt(self, attempt: LoginAttempt):
+        """ذخیره لاگ تلاش ورود"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO login_attempts 
+                (attempt_id, phone, timestamp, success, method, ip_address, 
+                 user_agent, error_message, response_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                attempt.attempt_id, attempt.phone, attempt.timestamp,
+                attempt.success, attempt.method.value, attempt.ip_address,
+                attempt.user_agent, attempt.error_message, attempt.response_time
+            ))
+            
+            self.conn.commit()
+        except Exception as e:
+            logger.error(f"خطا در ذخیره لاگ ورود: {e}")
 
 # ========== رابط خط فرمان ==========
 
